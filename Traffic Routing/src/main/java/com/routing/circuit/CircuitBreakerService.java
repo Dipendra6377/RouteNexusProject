@@ -1,5 +1,6 @@
 package com.routing.circuit;
 
+import com.routing.monitoring.MetricsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -11,6 +12,8 @@ public class CircuitBreakerService {
     private static final long OPEN_TIMEOUT = 30000;
 
     private final CircuitBreakerManager manager;
+
+    private final MetricsService metricsService;
 
     public boolean allowRequest(String serviceUrl) {
 
@@ -72,6 +75,9 @@ public class CircuitBreakerService {
         breaker.setFailureCount(0);
         breaker.setState(CircuitState.CLOSED);
 
+        // Metrics
+        metricsService.circuitClose();
+
         System.out.println("Failure Count Reset");
         System.out.println("State -> CLOSED");
         System.out.println("=============================");
@@ -97,6 +103,9 @@ public class CircuitBreakerService {
 
             breaker.setLastFailureTime(
                     System.currentTimeMillis());
+
+            // Metrics
+            metricsService.circuitOpen();
 
             System.out.println("Circuit OPENED");
         }

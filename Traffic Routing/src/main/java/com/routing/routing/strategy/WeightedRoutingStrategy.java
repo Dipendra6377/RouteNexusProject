@@ -1,13 +1,12 @@
 package com.routing.routing.strategy;
 
 import com.routing.circuit.CircuitBreakerService;
-import com.routing.routing.cache.RoutingCacheService;
 import com.routing.persistant.entity.ServiceInstanceEntity;
 import com.routing.persistant.mapper.ServiceInstanceMapper;
+import com.routing.persistant.repository.ServiceInstanceRepository;
+import com.routing.routing.cache.RoutingCacheService;
 import com.routing.routing.model.RouteRequest;
 import com.routing.routing.model.ServiceInstance;
-
-import com.routing.persistant.repository.ServiceInstanceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -29,31 +28,20 @@ public class WeightedRoutingStrategy implements RoutingStrategy {
     @Override
     public ServiceInstance route(RouteRequest request) {
 
-        List<ServiceInstance> instances =
-                cacheService.get(request.getServiceName());
+        return route(request, List.of());
+    }
 
-        if (instances == null) {
+    public ServiceInstance route(
+            RouteRequest request,
+            List<String> excludedUrls) {
 
-            List<ServiceInstanceEntity> entities =
-                    repository.findByServiceNameAndActiveTrue(
-                            request.getServiceName());
+        List<ServiceInstance> instances = loadInstances(request);
 
-            if (entities.isEmpty()) {
-                throw new RuntimeException("No active instance found.");
-            }
-
-            instances = mapper.toModelList(entities);
-
-            cacheService.put(
-                    request.getServiceName(),
-                    instances);
-
-            System.out.println("Loaded from PostgreSQL");
-
-        } else {
-
-            System.out.println("Loaded from Redis");
-        }
+        // Remove already attempted instances
+        instances = instances.stream()
+                .filter(instance ->
+                        !excludedUrls.contains(instance.getUrl()))
+                .toList();
 
         // Remove instances whose circuit is OPEN
         instances = instances.stream()
@@ -71,6 +59,43 @@ public class WeightedRoutingStrategy implements RoutingStrategy {
 
         return selectByWeight(instances);
     }
+
+    private List<ServiceInstance> loadInstances(
+            RouteRequest request) {
+
+        List<ServiceInstance> instances =
+                cacheService.get(request.getServiceName());
+
+        if (instances == null) {
+
+            List<ServiceInstanceEntity> entities =
+                    repository.findByServiceNameAndActiveTrue(
+                            request.getServiceName());
+
+            if (entities.isEmpty()) {
+
+                throw new RuntimeException(
+                        "No active instance found.");
+
+            }
+
+            instances = mapper.toModelList(entities);
+
+            cacheService.put(
+                    request.getServiceName(),
+                    instances);
+
+            System.out.println("Loaded from PostgreSQL");
+
+        } else {
+
+            System.out.println("Loaded from Redis");
+
+        }
+
+        return instances;
+    }
+
     private ServiceInstance selectByWeight(
             List<ServiceInstance> instances) {
 
@@ -89,11 +114,14 @@ public class WeightedRoutingStrategy implements RoutingStrategy {
             cumulative += instance.getWeight();
 
             if (random < cumulative) {
+
                 return instance;
+
             }
         }
 
-        throw new IllegalStateException("Routing failed.");
+        throw new IllegalStateException(
+                "Routing failed.");
     }
 
 }

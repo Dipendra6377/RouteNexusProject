@@ -1,5 +1,6 @@
 package com.checkout.controller;
 
+import com.checkout.config.VersionProperties;
 import com.checkout.model.CheckoutResponse;
 import com.checkout.service.CheckoutService;
 import lombok.RequiredArgsConstructor;
@@ -10,13 +11,20 @@ import org.springframework.web.bind.annotation.RestController;
 public class CheckoutController {
 
     private final CheckoutService checkoutService;
+    private final VersionProperties versionProperties;
 
-    public CheckoutController(CheckoutService checkoutService) {
+    public CheckoutController(CheckoutService checkoutService, VersionProperties versionProperties) {
         this.checkoutService = checkoutService;
+        this.versionProperties = versionProperties;
     }
 
     @GetMapping("/checkout")
     public CheckoutResponse checkout() {
-        throw new RuntimeException("Boom");
+
+        if ("v2".equals(versionProperties.getVersion())) {
+            throw new RuntimeException("Boom");
+        }
+
+        return checkoutService.checkout();
     }
 }

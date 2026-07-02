@@ -3,6 +3,7 @@ package com.routing.routing.cache;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.routing.monitoring.MetricsService;
 import com.routing.routing.model.ServiceInstance;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -21,14 +22,25 @@ public class RoutingCacheService {
 
     private final ObjectMapper objectMapper;
 
+    private final MetricsService metricsService;
+
     public List<ServiceInstance> get(String serviceName) {
 
         String json =
                 redisTemplate.opsForValue().get(serviceName);
 
         if (json == null) {
+
+            System.out.println("Redis Cache MISS");
+
+            metricsService.cacheMiss();
+
             return null;
         }
+
+        System.out.println("Redis Cache HIT");
+
+        metricsService.cacheHit();
 
         try {
 
@@ -52,10 +64,8 @@ public class RoutingCacheService {
             String json =
                     objectMapper.writeValueAsString(instances);
 
-            redisTemplate.opsForValue().set(
-                    serviceName,
-                    json,
-                    TTL);
+            redisTemplate.opsForValue()
+                    .set(serviceName, json, TTL);
 
         } catch (JsonProcessingException e) {
 
@@ -69,6 +79,7 @@ public class RoutingCacheService {
         redisTemplate.delete(serviceName);
 
     }
+
     public void clear() {
 
         redisTemplate.getConnectionFactory()
