@@ -17,6 +17,6 @@ public class CheckoutController {
 
     @GetMapping("/checkout")
     public CheckoutResponse checkout() {
-        return checkoutService.checkout();
+        throw new RuntimeException("Boom");
     }
 }

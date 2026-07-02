@@ -1,10 +1,12 @@
 package com.routing.routing.strategy;
 
+import com.routing.circuit.CircuitBreakerService;
 import com.routing.routing.cache.RoutingCacheService;
 import com.routing.persistant.entity.ServiceInstanceEntity;
 import com.routing.persistant.mapper.ServiceInstanceMapper;
 import com.routing.routing.model.RouteRequest;
 import com.routing.routing.model.ServiceInstance;
+
 import com.routing.persistant.repository.ServiceInstanceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -17,6 +19,8 @@ import java.util.concurrent.ThreadLocalRandom;
 public class WeightedRoutingStrategy implements RoutingStrategy {
 
     private final ServiceInstanceRepository repository;
+
+    private final CircuitBreakerService circuitBreakerService;
 
     private final ServiceInstanceMapper mapper;
 
@@ -45,14 +49,28 @@ public class WeightedRoutingStrategy implements RoutingStrategy {
                     instances);
 
             System.out.println("Loaded from PostgreSQL");
+
         } else {
 
             System.out.println("Loaded from Redis");
         }
 
+        // Remove instances whose circuit is OPEN
+        instances = instances.stream()
+                .filter(instance ->
+                        circuitBreakerService.allowRequest(
+                                instance.getUrl()))
+                .toList();
+
+        if (instances.isEmpty()) {
+
+            throw new RuntimeException(
+                    "No healthy instance available.");
+
+        }
+
         return selectByWeight(instances);
     }
-
     private ServiceInstance selectByWeight(
             List<ServiceInstance> instances) {
 

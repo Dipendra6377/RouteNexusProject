@@ -1,5 +1,6 @@
 package com.routing.routing.service;
 
+import com.routing.circuit.CircuitBreakerService;
 import com.routing.routing.model.RouteRequest;
 import com.routing.routing.model.ServiceInstance;
 import com.routing.routing.dto.CheckoutResponse;
@@ -16,6 +17,8 @@ public class RouterService {
 
     private final CheckoutGateway checkoutGateway;
 
+    private final CircuitBreakerService circuitBreakerService;
+
     public CheckoutResponse checkout() {
 
         RouteRequest request = new RouteRequest();
@@ -23,8 +26,26 @@ public class RouterService {
 
         ServiceInstance instance =
                 routingStrategy.route(request);
+        System.out.println("Routing to : " + instance.getVersion());
+        try {
 
-        return checkoutGateway.forward(instance);
+            CheckoutResponse response =
+                    checkoutGateway.forward(instance);
+
+            circuitBreakerService.recordSuccess(
+                    instance.getUrl());
+
+            return response;
+
+        } catch (Exception ex) {
+
+            circuitBreakerService.recordFailure(
+                    instance.getUrl());
+
+            throw ex;
+
+        }
+
     }
 
 }
