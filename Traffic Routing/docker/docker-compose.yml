@@ -1,10 +1,12 @@
+version: '3.9'
+
 services:
+
   postgres:
+
     image: postgres:17
 
     container_name: traffic-router-postgres
-
-    restart: unless-stopped
 
     environment:
       POSTGRES_DB: traffic_router
@@ -14,10 +16,11 @@ services:
     ports:
       - "5432:5432"
 
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - traffic-network
 
   redis:
+
     image: redis:8
 
     container_name: traffic-router-redis
@@ -25,8 +28,143 @@ services:
     ports:
       - "6379:6379"
 
-    restart: unless-stopped
+    networks:
+      - traffic-network
 
-volumes:
-  postgres_data:
+  router1:
 
+    image: traffic-router
+
+    container_name: router1
+
+    depends_on:
+      - postgres
+      - redis
+
+    environment:
+
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/traffic_router
+
+      SPRING_DATA_REDIS_HOST: redis
+
+    ports:
+      - "8080:8080"
+
+    networks:
+      - traffic-network
+
+  router2:
+
+    image: traffic-router
+
+    container_name: router2
+
+    depends_on:
+      - postgres
+      - redis
+
+    environment:
+
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/traffic_router
+
+      SPRING_DATA_REDIS_HOST: redis
+
+    ports:
+      - "8085:8080"
+
+    networks:
+      - traffic-network
+
+  checkout-v1:
+
+    image: checkout-service
+
+    container_name: checkout-v1
+
+    environment:
+      SERVER_PORT: 8081
+      VERSION: v1
+
+    ports:
+      - "8081:8081"
+
+    networks:
+      - traffic-network
+
+  checkout-v2:
+
+    image: checkout-service
+
+    container_name: checkout-v2
+
+    environment:
+      SERVER_PORT: 8082
+      VERSION: v2
+
+    ports:
+      - "8082:8082"
+
+    networks:
+      - traffic-network
+
+  checkout-v3:
+
+    image: checkout-service
+
+    container_name: checkout-v3
+
+    environment:
+      SERVER_PORT: 8083
+      VERSION: v3
+
+    ports:
+      - "8083:8083"
+
+    networks:
+      - traffic-network
+
+  prometheus:
+
+    image: prom/prometheus
+
+    container_name: prometheus
+
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+
+    ports:
+      - "9090:9090"
+
+    networks:
+      - traffic-network
+
+  grafana:
+
+    image: grafana/grafana
+
+    container_name: grafana
+
+    ports:
+      - "3000:3000"
+
+    networks:
+      - traffic-network
+
+  nginx:
+    image: nginx
+    container_name: nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - router1
+      - router2
+    networks:
+      - traffic-network
+
+networks:
+
+  traffic-network:
+
+    driver: bridge

@@ -1,12 +1,22 @@
 package com.routing.monitoring;
 
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import org.springframework.stereotype.Service;
 
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+
 @Service
 public class MetricsService {
+
+    private final MeterRegistry registry;
+
+    // ===========================
+    // Counters
+    // ===========================
 
     private final Counter totalRequests;
 
@@ -22,9 +32,29 @@ public class MetricsService {
 
     private final Counter circuitCloseCounter;
 
+    private final Counter rateLimitAllowedCounter;
+
+    private final Counter rateLimitRejectedCounter;
+
+    // ===========================
+    // Gauges
+    // ===========================
+
+    private final AtomicInteger remainingTokens =
+            new AtomicInteger();
+
+    // ===========================
+    // Timer
+    // ===========================
+
     private final Timer routingTimer;
 
-    private final MeterRegistry registry;
+    // ===========================
+    // Dynamic Counters
+    // ===========================
+
+    private final ConcurrentHashMap<String, Counter> versionCounters =
+            new ConcurrentHashMap<>();
 
     public MetricsService(MeterRegistry registry) {
 
@@ -37,12 +67,12 @@ public class MetricsService {
 
         retryCounter =
                 Counter.builder("router_retry_total")
-                        .description("Retry attempts")
+                        .description("Total retry attempts")
                         .register(registry);
 
         failoverCounter =
                 Counter.builder("router_failover_total")
-                        .description("Failovers")
+                        .description("Total failovers")
                         .register(registry);
 
         cacheHitCounter =
@@ -57,61 +87,127 @@ public class MetricsService {
 
         circuitOpenCounter =
                 Counter.builder("router_circuit_open_total")
+                        .description("Circuit opened")
                         .register(registry);
 
         circuitCloseCounter =
                 Counter.builder("router_circuit_close_total")
+                        .description("Circuit closed")
                         .register(registry);
 
+        rateLimitAllowedCounter =
+                Counter.builder("rate_limit_allowed_total")
+                        .description("Allowed requests")
+                        .register(registry);
+
+        rateLimitRejectedCounter =
+                Counter.builder("rate_limit_rejected_total")
+                        .description("Rejected requests")
+                        .register(registry);
+
+        Gauge.builder(
+                        "rate_limit_remaining_tokens",
+                        remainingTokens,
+                        AtomicInteger::get)
+                .description("Remaining tokens in bucket")
+                .register(registry);
+
         routingTimer =
-                Timer.builder("router_latency")
+                Timer.builder("router_request_latency_seconds")
                         .description("Routing latency")
                         .register(registry);
     }
 
+    // ==================================================
+    // Routing Metrics
+    // ==================================================
+
     public void incrementRequest() {
+
         totalRequests.increment();
     }
 
     public void incrementRetry() {
+
         retryCounter.increment();
     }
 
     public void incrementFailover() {
+
         failoverCounter.increment();
     }
 
+    // ==================================================
+    // Cache Metrics
+    // ==================================================
+
     public void cacheHit() {
+
         cacheHitCounter.increment();
     }
 
     public void cacheMiss() {
+
         cacheMissCounter.increment();
     }
 
+    // ==================================================
+    // Circuit Breaker Metrics
+    // ==================================================
+
     public void circuitOpen() {
+
         circuitOpenCounter.increment();
     }
 
     public void circuitClose() {
+
         circuitCloseCounter.increment();
     }
 
+    // ==================================================
+    // Rate Limiter Metrics
+    // ==================================================
+
+    public void rateLimitAllowed(int remainingTokens) {
+
+        rateLimitAllowedCounter.increment();
+
+        this.remainingTokens.set(remainingTokens);
+    }
+
+    public void rateLimitRejected() {
+
+        rateLimitRejectedCounter.increment();
+    }
+
+    // ==================================================
+    // Timer
+    // ==================================================
+
     public Timer.Sample startTimer() {
+
         return Timer.start(registry);
     }
 
     public void stopTimer(Timer.Sample sample) {
+
         sample.stop(routingTimer);
     }
 
+    // ==================================================
+    // Backend Version Metrics
+    // ==================================================
+
     public void incrementVersion(String version) {
 
-        Counter.builder("router_version_requests_total")
-                .tag("version", version)
-                .register(registry)
+        versionCounters
+                .computeIfAbsent(
+                        version,
+                        v -> Counter.builder("router_backend_requests_total")
+                                .description("Requests routed to backend instances")
+                                .tag("version", v)
+                                .register(registry))
                 .increment();
-
     }
-
 }

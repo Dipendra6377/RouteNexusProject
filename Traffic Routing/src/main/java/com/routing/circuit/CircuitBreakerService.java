@@ -1,6 +1,7 @@
 package com.routing.circuit;
 
 import com.routing.monitoring.MetricsService;
+import com.routing.pubsub.CircuitEventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -10,6 +11,8 @@ public class CircuitBreakerService {
 
     private static final int FAILURE_THRESHOLD = 5;
     private static final long OPEN_TIMEOUT = 30000;
+
+    private final CircuitEventPublisher publisher;
 
     private final CircuitBreakerManager manager;
 
@@ -77,6 +80,7 @@ public class CircuitBreakerService {
 
         // Metrics
         metricsService.circuitClose();
+        publisher.publishClose(serviceUrl);
 
         System.out.println("Failure Count Reset");
         System.out.println("State -> CLOSED");
@@ -106,6 +110,7 @@ public class CircuitBreakerService {
 
             // Metrics
             metricsService.circuitOpen();
+            publisher.publishOpen(serviceUrl);
 
             System.out.println("Circuit OPENED");
         }

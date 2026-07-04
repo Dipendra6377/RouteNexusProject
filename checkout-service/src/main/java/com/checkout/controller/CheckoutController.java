@@ -21,10 +21,6 @@ public class CheckoutController {
     @GetMapping("/checkout")
     public CheckoutResponse checkout() {
 
-        if ("v2".equals(versionProperties.getVersion())) {
-            throw new RuntimeException("Boom");
-        }
-
         return checkoutService.checkout();
     }
 }

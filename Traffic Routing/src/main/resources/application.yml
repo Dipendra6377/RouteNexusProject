@@ -6,7 +6,7 @@ spring:
     name: traffic-router
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/traffic_router
+    url: jdbc:postgresql://host.docker.internal:5432/traffic_router
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
@@ -25,7 +25,7 @@ spring:
 
   data:
     redis:
-      host: localhost
+      host: host.docker.internal
       port: 6379
 
 routing:

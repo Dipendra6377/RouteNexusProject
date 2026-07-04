@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.routing.monitoring.MetricsService;
+import com.routing.pubsub.RoutingEventPublisher;
 import com.routing.routing.model.ServiceInstance;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -23,6 +24,8 @@ public class RoutingCacheService {
     private final ObjectMapper objectMapper;
 
     private final MetricsService metricsService;
+
+    private final RoutingEventPublisher publisher;
 
     public List<ServiceInstance> get(String serviceName) {
 
@@ -76,10 +79,19 @@ public class RoutingCacheService {
 
     public void evict(String serviceName) {
 
-        redisTemplate.delete(serviceName);
+        evictLocal(serviceName);
 
+        publisher.publish(
+                "CACHE_CLEAR",
+                serviceName);
     }
 
+    public void evictLocal(String serviceName) {
+
+        redisTemplate.delete(serviceName);
+
+        System.out.println("Local Cache Cleared");
+    }
     public void clear() {
 
         redisTemplate.getConnectionFactory()

@@ -57,6 +57,14 @@ public class WeightedRoutingStrategy implements RoutingStrategy {
 
         }
 
+        System.out.println("==== Eligible Instances ====");
+
+        instances.forEach(i ->
+                System.out.println(
+                        i.getVersion()
+                                + " weight="
+                                + i.getWeight()));
+
         return selectByWeight(instances);
     }
 

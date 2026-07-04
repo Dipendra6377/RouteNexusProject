@@ -2,6 +2,7 @@ package com.routing.admin.controller;
 
 import com.routing.admin.dto.UpdateWeightRequest;
 import com.routing.admin.service.AdminService;
+import com.routing.routing.cache.RoutingCacheService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 public class AdminController {
 
     private final AdminService adminService;
+    private final RoutingCacheService cacheService;
 
     @PutMapping("/weight")
     public String updateWeight(
@@ -22,4 +24,12 @@ public class AdminController {
 
     }
 
+    @PostMapping("/cache/clear")
+    public String clear() {
+
+        cacheService.evict("checkout-service");
+
+        return "Cache Cleared";
+
+    }
 }
